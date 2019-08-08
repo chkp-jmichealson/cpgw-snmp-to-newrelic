@@ -131,7 +131,7 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     # define argparse helper meta 
-    example_text = 'Example: \n %s --community public --nrkey ABC123 --snmpip 10.3.2.1' % sys.argv[0]
+    example_text = 'Example: \n %s --community public --account 1234567 --key 12345678Z-2jAnRQlUHgjjKE12345678 --ip 10.3.2.1 --interval 300 --verbose' % sys.argv[0]
 
     parser = argparse.ArgumentParser(
      epilog=example_text,
