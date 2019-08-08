@@ -157,7 +157,7 @@ def main(argv=None):
         os._exit(1)
     
     OPTIONS = parser.parse_args(argv)
-    if OPTIONS.snmp_community and OPTIONS.nr_key and OPTIONS.snmp_agent_ip:
+    if OPTIONS.snmp_community and OPTIONS.nr_key and OPTIONS.snmp_agent_ip and OPTIONS.ins_interval:
         print('\n:: Check Point Security Gateway Metrics to New Relic :: \nExecution time: %s \n' % str(datetime.now()))
     else:
         parser.print_help()
@@ -168,10 +168,8 @@ def main(argv=None):
     
     # Simple OID list
     metrics_list = [
-      {'metric_name': 'Throughput', 'datapoint_name': 'pps', 'oid': '1.3.6.1.2.1.1.5.0'} #iso.org.dod.internet.mgmt.mib-2.system.sysName.0 -- JUST AN EXAMPLE!
+      {'metric_name': 'Throughput', 'datapoint_name': 'pps', 'oid': '1.3.6.1.2.1.1.5.0'} # JUST AN EXAMPLE! -- iso.org.dod.internet.mgmt.mib-2.system.sysName.0
      ]
-
-    
     
     try:
         print('\nPress Ctrl-C to break\n')

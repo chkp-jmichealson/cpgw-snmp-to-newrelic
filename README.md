@@ -25,10 +25,10 @@ Below are the global and mode-specific arguments.
 | `--key`        | New Relic Insights insert key                             | |
 | `--ip`         | IP Address of SNMP Agent to poll                          | `127.0.0.1`   |	
 | `--interval`   | Time to wait between New Relic inserts (in seconds)       | `300`         |	
-| `--verbose`    | Verbose output                                            | False         |	
+| `--verbose`    | Verbose output                                            | `False`       |	
 
 ### How to run:
 ```bash
 # Syntax
-python .\snmp_to_nr.py --community public --account 1234567 --key 12345678Z-2jAnRQlUHgjjKE12345678 --ip 127.0.0.1 --interval 300 --verbose
+python snmp_to_nr.py --community public --account 1234567 --key 12345678Z-2jAnRQlUHgjjKE12345678 --ip 127.0.0.1 --interval 300 --verbose
 ```
