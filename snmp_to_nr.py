@@ -2,8 +2,8 @@
 
 # *******************************************************************************
 # Name: snmp_to_nr.py
-# Description: A automation script for Check Point Security Gateways to gather 
-#  metrics via SNMP and send a aggregated payload to New Relic
+# Description: An automation script for Check Point Security Gateways to gather 
+#  metrics via SNMP and send an aggregated payload to New Relic Insights
 #
 # Copywrite 2019, Check Point Software
 # www.checkpoint.com
@@ -141,9 +141,10 @@ def main(argv=None):
     optional = parser.add_argument_group('optional arguments')
 
     # Add arguments to argparse
-    required.add_argument('--community', dest='snmp_community', help='Name of SNMP community Id (e.g. "public")', required=True)  
-    required.add_argument('--account', dest='nr_account_num', help='New Relic Account Number (e.g. "1234567")', required=True)
-    required.add_argument('--key', dest='nr_key', help='New Relic Insights Insert Key', required=True)     
+    required.add_argument('--community', dest='snmp_community', help='Name of SNMP v1/v2 community Id (e.g. "public")', required=True)  
+    required.add_argument('--account', dest='nr_account_num', help='New Relic account number (e.g. "1234567")', required=True)
+    required.add_argument('--key', dest='nr_key', help='New Relic Insights Insert Key', required=True) 
+    optional.add_argument("--interval", dest="ins_interval", default=300, help="Time to wait between New Relic inserts (in seconds). Default: 300")    
     optional.add_argument('--ip', dest='snmp_agent_ip', default='127.0.0.1', help='IP Address of SNMP Agent to poll. Default: 127.0.0.1')
     optional.add_argument('--verbose', dest='verbose', default=False, help='Verbose output', action='store_true')
 
@@ -162,38 +163,37 @@ def main(argv=None):
         parser.print_help()
         os._exit(1)
     
-    # Pre-processing
+    # Pre-processing of OIDs
     cp_proc_usage_oids = get_cp_proc_usage_oids() # Get CPU Count to generate Proc Usage OIDs
     
     # Simple OID list
-    metrics_oid_list = [
-      '1.3.6.1.2.1.1.5.0', #iso.org.dod.internet.mgmt.mib-2.system.sysName.0
-      '1.3.6.1.4.1.2620.1.1.25.6'
+    metrics_list = [
+      {'metric_name': 'Throughput', 'datapoint_name': 'pps', 'oid': '1.3.6.1.2.1.1.5.0'} #iso.org.dod.internet.mgmt.mib-2.system.sysName.0 -- JUST AN EXAMPLE!
      ]
 
-    # Query SNMP and build events payload
-    nr_payload = []
+    
+    
     try:
         print('\nPress Ctrl-C to break\n')
         while True:
-            # Get CPU Usage metrics
+            nr_payload = []
+            # Query SNMP and build events payload
+            ## Get CPU Usage metrics
             for idx, proc_usage_oid in enumerate(cp_proc_usage_oids): 
                 data = get_snmp(OPTIONS.snmp_agent_ip, [proc_usage_oid], hlapi.CommunityData(OPTIONS.snmp_community))
                 nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', 'metricName': 'CPU Usage', 'proc%s_usage' % (idx + 1): data[data.keys()[0]]})
-            # OID List
-            for metric_oid in metrics_oid_list:
-                data = get_snmp(OPTIONS.snmp_agent_ip, [metric_oid], hlapi.CommunityData(OPTIONS.snmp_community))
-                nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', 'metricName': 'Hostname', 'hostname': data[data.keys()[0]]})
+            ## OID List
+            for item in metrics_list:
+                data = get_snmp(OPTIONS.snmp_agent_ip, [item['oid']], hlapi.CommunityData(OPTIONS.snmp_community))
+                nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', 'metricName': item['metric_name'], item['datapoint_name']: data[data.keys()[0]]})
             
             # Send all events to New Relic
-            #nr_payload =  {"eventType": "CheckPointPerformance", "proc1_usage": 1, "metricType": "Performance", "metricName": "CPU Usage"}
             send_to_nr(nr_payload)
-            time.sleep(15)
+            time.sleep(int(OPTIONS.ins_interval))
 
     except KeyboardInterrupt:
         print('Ctrl-C was pressed. Exiting...')
         os._exit(1)
-      
     
     ## FUTURE USE ##
     #its = get_bulk_auto(OPTIONS.snmp_agent_ip, [
