@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # *******************************************************************************
-# Name: snmp_to_nr.py
+# Name: cpsnmp_to_nr.py
 # Description: An automation script for Check Point Security Gateways to gather 
 #  metrics via SNMP and send an aggregated payload to New Relic Insights
 #
@@ -27,17 +27,6 @@ from datetime import datetime
 
 #SNMP v3
 # hlapi.UsmUserData('testuser', authKey='authenticationkey', privKey='encryptionkey', authProtocol=hlapi.usmHMACSHAAuthProtocol, privProtocol=hlapi.usmAesCfb128Protocol)
-
-def get_cp_proc_usage_oids():
-    proc_num_oid = '1.3.6.1.4.1.2620.1.6.7.2.7.0' # OID: iso.org.dod.internet.private.enterprises.checkpoint.products.svn.svnPerf.svnProc.procNum.0
-    proc_num = get_snmp(OPTIONS.snmp_agent_ip, [proc_num_oid], hlapi.CommunityData(OPTIONS.snmp_community)) 
-    print('\nNumber of CPUs on SNMP Agent: ' + str(proc_num[proc_num_oid]))
-
-    proc_usage_oids = []
-    for i in range(1, (proc_num[proc_num_oid] + 1)):
-        proc_usage_oids.append('1.3.6.1.4.1.2620.1.6.7.5.1.5.' + str(i) + '.0') # OID: .iso.org.dod.internet.private.enterprises.checkpoint.products.svn.svnPerf.multiProcTable.multiProcEntry.multiProcUsage.1.0
-
-    return proc_usage_oids
 
 def get_snmp(target, oids, credentials, port=161, engine=hlapi.SnmpEngine(), context=hlapi.ContextData()):
     handler = hlapi.getCmd(
@@ -98,16 +87,11 @@ def get_bulk(target, oids, credentials, count, start_from=0, port=161,
     )
     return fetch(handler, count)
 
-def get_bulk_auto(target, oids, credentials, count_oid, start_from=0, port=161,
-                  engine=hlapi.SnmpEngine(), context=hlapi.ContextData()):
-    count = get_snmp(target, [count_oid], credentials, port, engine, context)[count_oid]
-    return get_bulk(target, oids, credentials, count, start_from, port, engine, context)
-
 def send_to_nr(events):
     nr_url = 'https://insights-collector.newrelic.com/v1/accounts/%s/events' % OPTIONS.nr_account_num
  
     if OPTIONS.verbose:
-        print(json.dumps(events, indent=2))
+        print('\n' + json.dumps(events, indent=2))
   
     headers = {'Content-Type': 'application/json', 'X-Insert-Key': OPTIONS.nr_key, 'Content-Encoding': 'gzip'} #this is the NewRelic insert key, which is specific to the end user and must be configurable.    
     resp = ''
@@ -131,7 +115,7 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     # define argparse helper meta 
-    example_text = 'Example: \n %s --community public --account 1234567 --key 12345678Z-2jAnRQlUHgjjKE12345678 --ip 10.3.2.1 --interval 300 --verbose' % sys.argv[0]
+    example_text = example_text = 'Example: \n %s --community public --account 1234567 --key 12345678Z-2jAnRQlUHgjjKE12345678 --verbose' % sys.argv[0]
 
     parser = argparse.ArgumentParser(
      epilog=example_text,
@@ -144,7 +128,6 @@ def main(argv=None):
     required.add_argument('--community', dest='snmp_community', help='Name of SNMP v1/v2 community Id (e.g. "public")', required=True)  
     required.add_argument('--account', dest='nr_account_num', help='New Relic account number (e.g. "1234567")', required=True)
     required.add_argument('--key', dest='nr_key', help='New Relic Insights Insert Key', required=True) 
-    optional.add_argument("--interval", dest="ins_interval", default=300, help="Time to wait between New Relic inserts (in seconds). Default: 300")    
     optional.add_argument('--ip', dest='snmp_agent_ip', default='127.0.0.1', help='IP Address of SNMP Agent to poll. Default: 127.0.0.1')
     optional.add_argument('--verbose', dest='verbose', default=False, help='Verbose output', action='store_true')
 
@@ -157,53 +140,68 @@ def main(argv=None):
         os._exit(1)
     
     OPTIONS = parser.parse_args(argv)
-    if OPTIONS.snmp_community and OPTIONS.nr_key and OPTIONS.snmp_agent_ip and OPTIONS.ins_interval:
+    if OPTIONS.nr_account_num and OPTIONS.nr_key and OPTIONS.snmp_community and OPTIONS.snmp_agent_ip:
         print('\n:: Check Point Security Gateway Metrics to New Relic :: \nExecution time: %s \n' % str(datetime.now()))
     else:
         parser.print_help()
         os._exit(1)
     
     # Pre-processing of OIDs
-    cp_proc_usage_oids = get_cp_proc_usage_oids() # Get CPU Count to generate Proc Usage OIDs
+    #cp_proc_usage_oids = get_cp_proc_usage_oids() # Get CPU Count to generate Proc Usage OIDs
     
-    # Simple OID list
+    # read metrics_list.json file
+    #with open('metrics_list.json', 'r') as jsonfile:
+    #    filedata = jsonfile.read()
+
+    #load metrics_list from file data
+    #metrics_list = json.loads(filedata)
     metrics_list = [
-      {'metric_name': 'Throughput', 'datapoint_name': 'pps', 'oid': '1.3.6.1.2.1.1.5.0'} # JUST AN EXAMPLE! -- iso.org.dod.internet.mgmt.mib-2.system.sysName.0
+      {'metric_name': 'cpvIpsecEspEncPkts', 'metric_oid': '1.3.6.1.4.1.2620.1.2.5.4.5'},
+      {'metric_name': 'cpvIpsecEspDecPkts', 'metric_oid': '1.3.6.1.4.1.2620.1.2.5.4.6'},
+      {'metric_name': 'memTotalReal64', 'metric_oid': '1.3.6.1.4.1.2620.1.6.7.4.3.0'},
+      {'metric_name': 'memActiveReal64', 'metric_oid': '1.3.6.1.4.1.2620.1.6.7.4.4.0'},
+      {'metric_name': 'memFreeReal64', 'metric_oid': '1.3.6.1.4.1.2620.1.6.7.4.5.0'}, 
+      {'metric_name': 'multiProcUsage', 'metric_oid': '1.3.6.1.4.1.2620.1.6.7.5.1.5.%.0', 'index_oid': '1.3.6.1.4.1.2620.1.6.7.2.7.0', 'labels': [{'label_name': 'multiProcIndex', 'label_oid': '1.3.6.1.4.1.2620.1.6.7.5.1.1.%.0'}]},
+      {'metric_name': 'ifInOctets', 'metric_oid': '1.3.6.1.2.1.2.2.1.10.%', 'index_oid': '1.3.6.1.2.1.2.1.0', 'labels': [{'label_name': 'ifDescr', 'label_oid': '1.3.6.1.2.1.2.2.1.2.%'}]}
      ]
     
-    try:
-        print('\nPress Ctrl-C to break\n')
-        while True:
-            nr_payload = []
-            # Query SNMP and build events payload
-            ## Get CPU Usage metrics
-            for idx, proc_usage_oid in enumerate(cp_proc_usage_oids): 
-                data = get_snmp(OPTIONS.snmp_agent_ip, [proc_usage_oid], hlapi.CommunityData(OPTIONS.snmp_community))
-                nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', 'metricName': 'CPU Usage', 'proc%s_usage' % (idx + 1): data[data.keys()[0]]})
-            ## OID List
-            for item in metrics_list:
-                data = get_snmp(OPTIONS.snmp_agent_ip, [item['oid']], hlapi.CommunityData(OPTIONS.snmp_community))
-                nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', 'metricName': item['metric_name'], item['datapoint_name']: data[data.keys()[0]]})
-            
-            # Send all events to New Relic
-            send_to_nr(nr_payload)
-            time.sleep(int(OPTIONS.ins_interval))
+    nr_payload = []
+    # Query SNMP and build events payload
 
-    except KeyboardInterrupt:
-        print('Ctrl-C was pressed. Exiting...')
-        os._exit(1)
+    for item in metrics_list:
+        elements = ''
+        labels = {}
+        if 'index_oid' in item:
+            elements = get_snmp(OPTIONS.snmp_agent_ip, [item['index_oid']], hlapi.CommunityData(OPTIONS.snmp_community))
+            print('Element count: %s' % elements[item['index_oid']])
+        
+        if elements:
+            for i in range(1, (elements[elements.keys()[0]] + 1)): #elements[item['index_oid']]
+                current_metric_oid = item['metric_oid'].replace('%', str(i))
+                metric_data = get_snmp(OPTIONS.snmp_agent_ip, [current_metric_oid], hlapi.CommunityData(OPTIONS.snmp_community))
+                print(metric_data)
+                if metric_data[metric_data.keys()[0]]:
+                    if 'labels' in item.keys():
+                        for label in item['labels']:
+                            label_oid = label['label_oid'].replace('%', str(i))
+                            label_data = get_snmp(OPTIONS.snmp_agent_ip, [label_oid], hlapi.CommunityData(OPTIONS.snmp_community))
+                            labels = {label['label_name']: label_data[label_data.keys()[0]]} 
+                            #print(labels)
+                    nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', item['metric_name']: metric_data[metric_data.keys()[0]], 'labels': labels})
+        else:
+            current_metric_oid = item['metric_oid']
+            metric_data = get_snmp(OPTIONS.snmp_agent_ip, [current_metric_oid], hlapi.CommunityData(OPTIONS.snmp_community))
+            print(metric_data)
+            if metric_data[metric_data.keys()[0]]:
+                nr_payload.append({'eventType': 'CheckPointPerformance', 'metricType': 'Performance', item['metric_name']: metric_data[metric_data.keys()[0]], 'labels': labels})
+            else:
+                print('\tOID data is null: %s' % (current_metric_oid))
     
-    ## FUTURE USE ##
-    #its = get_bulk_auto(OPTIONS.snmp_agent_ip, [
-    #    '1.3.6.1.2.1.2.2.1.2',
-    #    '1.3.6.1.2.1.31.1.1.1.18',
-    #    '1.3.6.1.2.1.1.1.0'
-    #    ], hlapi.CommunityData(snmp_community), '1.3.6.1.2.1.2.1.0')
-    # We print the results in format OID=value
-
-    #for it in its:
-    #    for k, v in it.items():
-    #        print("{0}={1}".format(k, v))
-    #    print('') # We leave a blank line between the output of each interface
+    # Send all events to New Relic
+    if nr_payload:
+        send_to_nr(nr_payload)
+    else:
+        print('Error: Payload is null')
+        os._exit(1)
 
 if __name__ == '__main__': main()
